@@ -1,0 +1,6 @@
+BACKGROUND = "#10151d"
+PANEL = "#191f29"
+PANEL_LIGHT = "#222a36"
+TEXT = "#f4f6fb"
+MUTED = "#9ca7b8"
+ACCENT = "#54c8a4"
