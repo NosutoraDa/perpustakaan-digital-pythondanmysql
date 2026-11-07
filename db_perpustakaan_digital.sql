@@ -49,23 +49,15 @@ CREATE TABLE IF NOT EXISTS peminjaman (
         FOREIGN KEY (id_buku) REFERENCES buku_digital (id_buku)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Tag materi dapat ditambah dan diubah oleh admin, lalu dipasang ke banyak buku.
+-- Tag materi disimpan langsung bersama buku agar cukup menggunakan satu tabel.
 CREATE TABLE IF NOT EXISTS tag_buku (
     id_tag INT NOT NULL AUTO_INCREMENT,
+    id_buku INT NOT NULL,
     nama_tag VARCHAR(60) NOT NULL,
     PRIMARY KEY (id_tag),
-    UNIQUE KEY unik_nama_tag (nama_tag)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-CREATE TABLE IF NOT EXISTS buku_tag (
-    id_buku INT NOT NULL,
-    id_tag INT NOT NULL,
-    PRIMARY KEY (id_buku, id_tag),
-    CONSTRAINT fk_buku_tag_buku
+    UNIQUE KEY unik_buku_tag (id_buku, nama_tag),
+    CONSTRAINT fk_tag_buku_buku
         FOREIGN KEY (id_buku) REFERENCES buku_digital (id_buku)
-        ON DELETE CASCADE,
-    CONSTRAINT fk_buku_tag_tag
-        FOREIGN KEY (id_tag) REFERENCES tag_buku (id_tag)
         ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

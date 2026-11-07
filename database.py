@@ -134,33 +134,133 @@ def setup_database():
         cursor.execute("SELECT id_pengguna, nama_pengguna, peran FROM pengguna LIMIT 0")
         cursor.execute("SELECT id_buku, judul_buku FROM buku_digital LIMIT 0")
         cursor.execute("SELECT id_pinjam, id_pengguna, id_buku FROM peminjaman LIMIT 0")
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tag_buku (
-                id_tag INT NOT NULL AUTO_INCREMENT,
-                nama_tag VARCHAR(60) NOT NULL,
-                PRIMARY KEY (id_tag),
-                UNIQUE KEY unik_nama_tag (nama_tag)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            """
-        )
-        cursor.execute(
-            """
-            CREATE TABLE IF NOT EXISTS buku_tag (
-                id_buku INT NOT NULL,
-                id_tag INT NOT NULL,
-                PRIMARY KEY (id_buku, id_tag),
-                CONSTRAINT fk_buku_tag_buku FOREIGN KEY (id_buku)
-                    REFERENCES buku_digital (id_buku) ON DELETE CASCADE,
-                CONSTRAINT fk_buku_tag_tag FOREIGN KEY (id_tag)
-                    REFERENCES tag_buku (id_tag) ON DELETE CASCADE
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            """
-        )
+        _setup_book_tags(connection, cursor)
         _expire_overdue_loans(cursor)
         connection.commit()
     finally:
         connection.close()
+
+
+def _setup_book_tags(connection, cursor):
+    schema = connection.database
+    cursor.execute(
+        """
+        SELECT TABLE_NAME
+        FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = %s AND TABLE_NAME IN ('tag_buku', 'buku_tag')
+        """,
+        (schema,),
+    )
+    tables = {row[0] for row in cursor.fetchall()}
+    if "tag_buku" not in tables:
+        cursor.execute(
+            """
+            CREATE TABLE tag_buku (
+                id_tag INT NOT NULL AUTO_INCREMENT,
+                id_buku INT NOT NULL,
+                nama_tag VARCHAR(60) NOT NULL,
+                PRIMARY KEY (id_tag),
+                UNIQUE KEY unik_buku_tag (id_buku, nama_tag),
+                CONSTRAINT fk_tag_buku_buku FOREIGN KEY (id_buku)
+                    REFERENCES buku_digital (id_buku) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """
+        )
+        if "buku_tag" in tables:
+            cursor.execute("DROP TABLE buku_tag")
+        return
+
+    cursor.execute(
+        """
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'tag_buku'
+        """,
+        (schema,),
+    )
+    columns = {row[0] for row in cursor.fetchall()}
+    if "id_buku" not in columns:
+        cursor.execute(
+            "ALTER TABLE tag_buku ADD COLUMN id_buku INT NULL"
+        )
+
+    cursor.execute(
+        """
+        SELECT DISTINCT INDEX_NAME
+        FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'tag_buku'
+          AND NON_UNIQUE = 0 AND INDEX_NAME <> 'PRIMARY'
+          AND INDEX_NAME IN (
+              SELECT INDEX_NAME
+              FROM INFORMATION_SCHEMA.STATISTICS
+              WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'tag_buku'
+              GROUP BY INDEX_NAME
+              HAVING COUNT(*) = 1 AND MAX(COLUMN_NAME) = 'nama_tag'
+          )
+        """,
+        (schema, schema),
+    )
+    for (index_name,) in cursor.fetchall():
+        escaped_index = index_name.replace("`", "``")
+        cursor.execute(f"ALTER TABLE tag_buku DROP INDEX `{escaped_index}`")
+
+    if "buku_tag" in tables:
+        cursor.execute(
+            """
+            INSERT INTO tag_buku (id_buku, nama_tag)
+            SELECT bt.id_buku, t.nama_tag
+            FROM buku_tag AS bt
+            JOIN tag_buku AS t ON t.id_tag = bt.id_tag
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM tag_buku AS existing
+                WHERE existing.id_buku = bt.id_buku
+                  AND existing.nama_tag = t.nama_tag
+            )
+            """
+        )
+        cursor.execute("DROP TABLE buku_tag")
+
+    cursor.execute("DELETE FROM tag_buku WHERE id_buku IS NULL")
+    cursor.execute(
+        "ALTER TABLE tag_buku MODIFY id_buku INT NOT NULL"
+    )
+    cursor.execute(
+        """
+        SELECT INDEX_NAME
+        FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'tag_buku'
+          AND INDEX_NAME = 'unik_buku_tag'
+        LIMIT 1
+        """,
+        (schema,),
+    )
+    if cursor.fetchone() is None:
+        cursor.execute(
+            """
+            ALTER TABLE tag_buku
+            ADD UNIQUE KEY unik_buku_tag (id_buku, nama_tag)
+            """
+        )
+    cursor.execute(
+        """
+        SELECT CONSTRAINT_NAME
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+        WHERE TABLE_SCHEMA = %s AND TABLE_NAME = 'tag_buku'
+          AND COLUMN_NAME = 'id_buku'
+          AND REFERENCED_TABLE_NAME = 'buku_digital'
+        LIMIT 1
+        """,
+        (schema,),
+    )
+    if cursor.fetchone() is None:
+        cursor.execute(
+            """
+            ALTER TABLE tag_buku
+            ADD CONSTRAINT fk_tag_buku_buku FOREIGN KEY (id_buku)
+            REFERENCES buku_digital (id_buku) ON DELETE CASCADE
+            """
+        )
 
 
 def _expire_overdue_loans(cursor, today=None):
@@ -491,12 +591,11 @@ def get_books(user_id=None):
                 GROUP BY id_buku
             ) AS inventory ON inventory.id_buku = b.id_buku
             LEFT JOIN (
-                SELECT bt.id_buku,
-                       GROUP_CONCAT(t.nama_tag ORDER BY t.nama_tag SEPARATOR ', ')
+                SELECT id_buku,
+                       GROUP_CONCAT(nama_tag ORDER BY nama_tag SEPARATOR ', ')
                            AS tags
-                FROM buku_tag AS bt
-                JOIN tag_buku AS t ON t.id_tag = bt.id_tag
-                GROUP BY bt.id_buku
+                FROM tag_buku
+                GROUP BY id_buku
             ) AS book_tags ON book_tags.id_buku = b.id_buku
             ORDER BY b.tgl_diunggah DESC, b.id_buku DESC
             """,
@@ -534,11 +633,10 @@ def get_book_tags(book_id):
         cursor = connection.cursor()
         cursor.execute(
             """
-            SELECT t.id_tag, t.nama_tag
-            FROM tag_buku AS t
-            JOIN buku_tag AS bt ON bt.id_tag = t.id_tag
-            WHERE bt.id_buku = %s
-            ORDER BY t.nama_tag
+            SELECT id_tag, nama_tag
+            FROM tag_buku
+            WHERE id_buku = %s
+            ORDER BY nama_tag
             """,
             (book_id,),
         )
@@ -547,17 +645,7 @@ def get_book_tags(book_id):
         connection.close()
 
 
-def get_all_tags():
-    connection = connect_database()
-    try:
-        cursor = connection.cursor()
-        cursor.execute("SELECT id_tag, nama_tag FROM tag_buku ORDER BY nama_tag")
-        return cursor.fetchall()
-    finally:
-        connection.close()
-
-
-def create_tag(name):
+def create_tag(book_id, name):
     name = name.strip()
     if not name or len(name) > 60:
         raise ValueError("Nama tag harus berisi 1–60 karakter.")
@@ -565,7 +653,10 @@ def create_tag(name):
     connection = connect_database()
     try:
         cursor = connection.cursor()
-        cursor.execute("INSERT INTO tag_buku (nama_tag) VALUES (%s)", (name,))
+        cursor.execute(
+            "INSERT INTO tag_buku (id_buku, nama_tag) VALUES (%s, %s)",
+            (book_id, name),
+        )
         connection.commit()
         return cursor.lastrowid
     finally:
@@ -644,24 +735,11 @@ def update_book_details(
         cursor.execute("SELECT id_buku FROM buku_digital WHERE id_buku = %s", (book_id,))
         if cursor.fetchone() is None:
             raise ValueError("Buku tidak ditemukan.")
-        tag_ids = []
-        for name in normalized_tags:
-            cursor.execute(
-                "SELECT id_tag FROM tag_buku WHERE nama_tag = %s", (name,)
-            )
-            tag = cursor.fetchone()
-            if tag is None:
-                cursor.execute(
-                    "INSERT INTO tag_buku (nama_tag) VALUES (%s)", (name,)
-                )
-                tag_ids.append(cursor.lastrowid)
-            else:
-                tag_ids.append(tag[0])
-        cursor.execute("DELETE FROM buku_tag WHERE id_buku = %s", (book_id,))
-        if tag_ids:
+        cursor.execute("DELETE FROM tag_buku WHERE id_buku = %s", (book_id,))
+        if normalized_tags:
             cursor.executemany(
-                "INSERT INTO buku_tag (id_buku, id_tag) VALUES (%s, %s)",
-                [(book_id, tag_id) for tag_id in tag_ids],
+                "INSERT INTO tag_buku (id_buku, nama_tag) VALUES (%s, %s)",
+                [(book_id, name) for name in normalized_tags],
             )
         connection.commit()
         return "Data buku berhasil diperbarui."

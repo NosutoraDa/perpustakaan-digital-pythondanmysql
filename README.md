@@ -60,7 +60,8 @@ python main.py
 Aplikasi memakai data pengguna, buku, dan peminjaman dari SQL dump yang diimpor.
 Saat terhubung ke database lama, aplikasi menambahkan kolom yang diperlukan,
 termasuk `cover_data`, `file_data`, `sinopsis`, `jumlah_stok`, dan `password_hash`,
-serta tabel `tag_buku` dan `buku_tag`.
+serta tabel `tag_buku`. Jika database masih memakai tabel relasi `buku_tag`,
+aplikasi memindahkan tag ke `tag_buku` lalu menghapus tabel relasi lama.
 Kolom path file dari database lama akan dipindahkan ke BLOB jika file asalnya
 masih tersedia, lalu kolom path lama dihapus. Jika file lama tidak ditemukan,
 aplikasi menampilkan error agar path tersebut dapat dipulihkan atau dibersihkan
@@ -82,8 +83,8 @@ MySQL/MariaDB berjalan dan database serta tabel hasil impor tersedia.
   yang tersedia.
 - Detail buku menggunakan bagian **Deskripsi Materi Pembelajaran** agar sesuai
   untuk buku akademik dan bahan ajar. Admin dapat membuat, mengganti nama, dan
-  menghapus tag materi, lalu memilih beberapa tag untuk setiap buku melalui
-  popup detail; tag juga dapat digunakan dalam pencarian katalog.
+  menghapus tag materi khusus per buku melalui popup detail; tag juga dapat
+  digunakan dalam pencarian katalog.
 - Panel admin untuk menambah buku dan mengubah judul, penulis, penerbit,
   sinopsis, sampul, stok, dan PDF, serta menghapus buku melalui satu jendela
   detail. Form tambah buku dan pengelolaan pengguna juga dibuka sebagai popup.
