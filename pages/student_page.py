@@ -1,3 +1,5 @@
+import base64
+from io import BytesIO
 import os
 import tempfile
 import uuid
@@ -107,9 +109,9 @@ class StudentPageMixin:
                 if search in " ".join(str(part or "") for part in book[1:4]).casefold()
             ]
         if self.active_filter == "Tersedia":
-            books = [book for book in books if not book[7]]
+                books = [book for book in books if not book[6] and book[9] > 0]
         elif self.active_filter == "Dipinjam":
-            books = [book for book in books if book[7] == "Dipinjam"]
+                books = [book for book in books if book[6] == "Dipinjam"]
 
         self.result_label.configure(text=f"{len(books)} buku")
         width = max(self.grid_canvas.winfo_width(), 760)
@@ -137,7 +139,7 @@ class StudentPageMixin:
             highlightthickness=0, cursor="hand2",
         )
         cover.pack()
-        cover_image = self.load_cover_image(book[5])
+        cover_image = self.load_cover_image(book[4])
         if cover_image:
             cover.create_image(84, 118, image=cover_image)
             cover.image = cover_image
@@ -166,7 +168,7 @@ class StudentPageMixin:
                 anchor="w", width=140, fill="#e0e5eb",
                 font=("Segoe UI", 8),
             )
-        if book[7] == "Dipinjam":
+        if book[6] == "Dipinjam":
             cover.create_rectangle(0, 0, 168, 23, fill=ACCENT, outline="")
             cover.create_text(
                 84, 11, text="ADA DI KOLEKSI SAYA",
@@ -189,19 +191,19 @@ class StudentPageMixin:
             widget.configure(cursor="hand2")
         return card
 
-    def load_cover_image(self, path):
-        if not path or not Path(path).is_file():
+    def load_cover_image(self, cover, width=168, height=236):
+        if not cover:
             return None
         try:
             if Image is not None and ImageTk is not None:
-                image = Image.open(path).convert("RGB")
-                image.thumbnail((168, 236))
+                image = Image.open(BytesIO(cover)).convert("RGB")
+                image.thumbnail((width, height))
                 return ImageTk.PhotoImage(image)
-            image = tk.PhotoImage(file=path)
+            image = tk.PhotoImage(data=base64.b64encode(cover).decode("ascii"))
             factor = max(
                 1,
-                (image.width() + 167) // 168,
-                (image.height() + 235) // 236,
+                (image.width() + width - 1) // width,
+                (image.height() + height - 1) // height,
             )
             return image.subsample(factor, factor)
         except (OSError, tk.TclError):
@@ -213,35 +215,101 @@ class StudentPageMixin:
         dialog.configure(bg=PANEL)
         dialog.transient(self)
         dialog.grab_set()
-        dialog.geometry("440x390")
+        dialog.geometry("760x500")
         body = tk.Frame(dialog, bg=PANEL)
         body.pack(fill="both", expand=True, padx=26, pady=24)
+        cover_frame = tk.Frame(body, bg=PANEL_LIGHT, width=230, height=340)
+        cover_frame.grid(row=0, column=0, rowspan=2, sticky="nw", padx=(0, 24))
+        cover_frame.grid_propagate(False)
+        cover_canvas = tk.Canvas(
+            cover_frame, width=230, height=340, bg=PANEL_LIGHT,
+            highlightthickness=0,
+        )
+        cover_canvas.pack()
+        cover_image = self.load_cover_image(book[4], 230, 340)
+        if cover_image:
+            cover_canvas.create_image(115, 170, image=cover_image)
+            cover_canvas.image = cover_image
+        else:
+            palette = ["#245d68", "#785342", "#514a76", "#35634e",
+                       "#76535f", "#3c587b", "#7b6743", "#345d55"]
+            color = palette[book[0] % len(palette)]
+            cover_canvas.create_rectangle(0, 0, 230, 340, fill=color, outline="")
+            cover_canvas.create_polygon(
+                0, 0, 230, 0, 230, 188, 0, 265,
+                fill="#ffffff", outline="", stipple="gray50",
+            )
+            cover_canvas.create_polygon(
+                0, 250, 230, 175, 230, 340, 0, 340,
+                fill="#10151d", outline="", stipple="gray50",
+            )
+            cover_canvas.create_text(
+                18, 165, text=(book[1] or "Tanpa judul").upper(),
+                anchor="w", width=195, fill=TEXT,
+                font=("Segoe UI", 18, "bold"),
+            )
+            cover_canvas.create_text(
+                18, 285, text=(book[2] or "Penulis tidak diketahui"),
+                anchor="w", width=195, fill="#e0e5eb",
+                font=("Segoe UI", 10),
+            )
+
+        details = tk.Frame(body, bg=PANEL)
+        details.grid(row=0, column=1, sticky="nsew")
+        body.grid_columnconfigure(1, weight=1)
+        body.grid_rowconfigure(0, weight=1)
         tk.Label(
-            body, text=book[1], bg=PANEL, fg=TEXT,
-            font=("Segoe UI", 19, "bold"), wraplength=380,
+            details, text=book[1], bg=PANEL, fg=TEXT,
+            font=("Segoe UI", 19, "bold"), wraplength=430,
             justify="left",
         ).pack(anchor="w")
         tk.Label(
-            body,
+            details,
             text=f"{book[2] or 'Penulis tidak diketahui'}"
                  f"   ·   {book[3] or 'Penerbit tidak diketahui'}",
             bg=PANEL, fg=MUTED, font=("Segoe UI", 9),
         ).pack(anchor="w", pady=(7, 18))
         status_text = (
-            f"Sedang dipinjam — batas pengembalian {book[8]}"
-            if book[7] == "Dipinjam"
-            else "Tersedia untuk dipinjam selama 7 hari."
+            f"Sedang dipinjam — batas pengembalian {book[7]}"
+            if book[6] == "Dipinjam"
+            else (
+                f"{book[9]} dari {book[8]} salinan tersedia "
+                "untuk dipinjam selama 7 hari."
+                if book[9] > 0
+                else f"Semua {book[8]} salinan sedang dipinjam."
+            )
         )
         tk.Label(
-            body, text=status_text, bg=PANEL, fg=ACCENT,
+            details, text=status_text, bg=PANEL, fg=ACCENT,
             font=("Segoe UI", 10, "bold"),
-        ).pack(anchor="w", pady=(0, 12))
+        ).pack(anchor="w", pady=(0, 16))
         tk.Label(
-            body, text=f"Diunggah: {book[6] or '-'}",
+            details, text="Sinopsis", bg=PANEL, fg=TEXT,
+            font=("Segoe UI", 11, "bold"),
+        ).pack(anchor="w", pady=(0, 6))
+        synopsis_frame = tk.Frame(details, bg=PANEL)
+        synopsis_frame.pack(fill="both", expand=True)
+        synopsis_text = tk.Text(
+            synopsis_frame, height=8, wrap="word", bg=PANEL,
+            fg=MUTED, font=("Segoe UI", 10), relief="flat",
+            padx=0, pady=0, spacing1=2, cursor="arrow",
+        )
+        synopsis_scrollbar = ttk.Scrollbar(
+            synopsis_frame, orient="vertical", command=synopsis_text.yview,
+        )
+        synopsis_text.configure(yscrollcommand=synopsis_scrollbar.set)
+        synopsis_text.insert(
+            "1.0", book[10] or "Sinopsis belum tersedia."
+        )
+        synopsis_text.configure(state="disabled")
+        synopsis_text.pack(side="left", fill="both", expand=True)
+        synopsis_scrollbar.pack(side="right", fill="y")
+        tk.Label(
+            details, text=f"Diunggah: {book[5] or '-'}",
             bg=PANEL, fg=MUTED, font=("Segoe UI", 9),
-        ).pack(anchor="w")
+        ).pack(anchor="w", pady=(12, 0))
         actions = tk.Frame(body, bg=PANEL)
-        actions.pack(side="bottom", fill="x", pady=(24, 0))
+        actions.grid(row=1, column=1, sticky="ew", pady=(18, 0))
 
         def loan_action(action):
             try:
@@ -257,7 +325,7 @@ class StudentPageMixin:
             except mysql.connector.Error as error:
                 messagebox.showerror("Kesalahan database", str(error), parent=dialog)
 
-        if book[7] == "Dipinjam":
+        if book[6] == "Dipinjam":
             self.make_button(
                 actions, "Kembalikan buku",
                 lambda: loan_action("return"), primary=True,
@@ -267,23 +335,32 @@ class StudentPageMixin:
                 lambda: self.open_book_record(book, dialog),
             ).pack(side="left", padx=8)
         else:
-            self.make_button(
-                actions, "Pinjam 7 hari",
-                lambda: loan_action("borrow"), primary=True,
-            ).pack(side="left")
+            if book[9] > 0:
+                self.make_button(
+                    actions, "Pinjam 7 hari",
+                    lambda: loan_action("borrow"), primary=True,
+                ).pack(side="left")
+            else:
+                tk.Label(
+                    actions, text="Stok habis", bg=PANEL, fg=MUTED,
+                    font=("Segoe UI", 9, "bold"),
+                ).pack(side="left")
         self.make_button(actions, "Tutup", dialog.destroy).pack(side="right")
 
     def open_book_record(self, book, parent):
         try:
-            file_data, legacy_path = get_book_file(book[0])
-            if file_data:
-                cache_dir = Path(tempfile.gettempdir()) / "ruang-baca"
-                cache_dir.mkdir(parents=True, exist_ok=True)
-                cached_file = cache_dir / f"{uuid.uuid4().hex}.pdf"
-                cached_file.write_bytes(file_data)
-                file_path = cached_file
-            else:
-                file_path = legacy_path
-            self.open_book(file_path, parent)
+            file_data = get_book_file(book[0])
+            if not file_data:
+                messagebox.showerror(
+                    "File tidak tersedia",
+                    "Buku ini belum memiliki file PDF.",
+                    parent=parent,
+                )
+                return
+            cache_dir = Path(tempfile.gettempdir()) / "ruang-baca"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cached_file = cache_dir / f"{uuid.uuid4().hex}.pdf"
+            cached_file.write_bytes(file_data)
+            self.open_book(cached_file, parent)
         except (OSError, ValueError, mysql.connector.Error) as error:
             messagebox.showerror("Tidak dapat membuka buku", str(error), parent=parent)
