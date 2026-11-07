@@ -134,7 +134,54 @@ def setup_database():
         cursor.execute("SELECT id_pengguna, nama_pengguna, peran FROM pengguna LIMIT 0")
         cursor.execute("SELECT id_buku, judul_buku FROM buku_digital LIMIT 0")
         cursor.execute("SELECT id_pinjam, id_pengguna, id_buku FROM peminjaman LIMIT 0")
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tag_buku (
+                id_tag INT NOT NULL AUTO_INCREMENT,
+                nama_tag VARCHAR(60) NOT NULL,
+                PRIMARY KEY (id_tag),
+                UNIQUE KEY unik_nama_tag (nama_tag)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """
+        )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS buku_tag (
+                id_buku INT NOT NULL,
+                id_tag INT NOT NULL,
+                PRIMARY KEY (id_buku, id_tag),
+                CONSTRAINT fk_buku_tag_buku FOREIGN KEY (id_buku)
+                    REFERENCES buku_digital (id_buku) ON DELETE CASCADE,
+                CONSTRAINT fk_buku_tag_tag FOREIGN KEY (id_tag)
+                    REFERENCES tag_buku (id_tag) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            """
+        )
+        _expire_overdue_loans(cursor)
         connection.commit()
+    finally:
+        connection.close()
+
+
+def _expire_overdue_loans(cursor, today=None):
+    cursor.execute(
+        """
+        UPDATE peminjaman
+        SET status = 'Kembali'
+        WHERE status = 'Aktif' AND tenggat_waktu <= %s
+        """,
+        (today or date.today(),),
+    )
+    return cursor.rowcount
+
+
+def expire_overdue_loans():
+    connection = connect_database()
+    try:
+        cursor = connection.cursor()
+        expired_count = _expire_overdue_loans(cursor)
+        connection.commit()
+        return expired_count
     finally:
         connection.close()
 
@@ -414,6 +461,8 @@ def get_books(user_id=None):
     connection = connect_database()
     try:
         cursor = connection.cursor()
+        if _expire_overdue_loans(cursor):
+            connection.commit()
         cursor.execute(
             """
             SELECT b.id_buku, b.judul_buku, b.penulis, b.penerbit,
@@ -428,7 +477,8 @@ def get_books(user_id=None):
                    GREATEST(
                        b.jumlah_stok - COALESCE(inventory.borrowed_count, 0), 0
                    ) AS available_count,
-                   b.sinopsis
+                   b.sinopsis,
+                   COALESCE(book_tags.tags, '')
             FROM buku_digital AS b
             LEFT JOIN peminjaman AS p
               ON p.id_buku = b.id_buku
@@ -440,6 +490,14 @@ def get_books(user_id=None):
                 WHERE status = 'Aktif'
                 GROUP BY id_buku
             ) AS inventory ON inventory.id_buku = b.id_buku
+            LEFT JOIN (
+                SELECT bt.id_buku,
+                       GROUP_CONCAT(t.nama_tag ORDER BY t.nama_tag SEPARATOR ', ')
+                           AS tags
+                FROM buku_tag AS bt
+                JOIN tag_buku AS t ON t.id_tag = bt.id_tag
+                GROUP BY bt.id_buku
+            ) AS book_tags ON book_tags.id_buku = b.id_buku
             ORDER BY b.tgl_diunggah DESC, b.id_buku DESC
             """,
             (user_id,),
@@ -455,7 +513,8 @@ def get_admin_book(book_id):
         cursor = connection.cursor()
         cursor.execute(
             """
-            SELECT id_buku, judul_buku, penulis, penerbit, sinopsis, cover_data
+            SELECT id_buku, judul_buku, penulis, penerbit, sinopsis, cover_data,
+                   jumlah_stok
             FROM buku_digital
             WHERE id_buku = %s
             """,
@@ -469,10 +528,103 @@ def get_admin_book(book_id):
         connection.close()
 
 
-def update_book_details(book_id, title, author, publisher, synopsis, cover_data):
+def get_book_tags(book_id):
+    connection = connect_database()
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            """
+            SELECT t.id_tag, t.nama_tag
+            FROM tag_buku AS t
+            JOIN buku_tag AS bt ON bt.id_tag = t.id_tag
+            WHERE bt.id_buku = %s
+            ORDER BY t.nama_tag
+            """,
+            (book_id,),
+        )
+        return cursor.fetchall()
+    finally:
+        connection.close()
+
+
+def get_all_tags():
+    connection = connect_database()
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT id_tag, nama_tag FROM tag_buku ORDER BY nama_tag")
+        return cursor.fetchall()
+    finally:
+        connection.close()
+
+
+def create_tag(name):
+    name = name.strip()
+    if not name or len(name) > 60:
+        raise ValueError("Nama tag harus berisi 1–60 karakter.")
+
+    connection = connect_database()
+    try:
+        cursor = connection.cursor()
+        cursor.execute("INSERT INTO tag_buku (nama_tag) VALUES (%s)", (name,))
+        connection.commit()
+        return cursor.lastrowid
+    finally:
+        connection.close()
+
+
+def rename_tag(tag_id, name):
+    name = name.strip()
+    if not name or len(name) > 60:
+        raise ValueError("Nama tag harus berisi 1–60 karakter.")
+
+    connection = connect_database()
+    try:
+        cursor = connection.cursor()
+        cursor.execute(
+            "UPDATE tag_buku SET nama_tag = %s WHERE id_tag = %s",
+            (name, tag_id),
+        )
+        if cursor.rowcount == 0:
+            cursor.execute(
+                "SELECT id_tag FROM tag_buku WHERE id_tag = %s", (tag_id,)
+            )
+            if cursor.fetchone() is None:
+                raise ValueError("Tag tidak ditemukan.")
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def delete_tag(tag_id):
+    connection = connect_database()
+    try:
+        cursor = connection.cursor()
+        cursor.execute("DELETE FROM tag_buku WHERE id_tag = %s", (tag_id,))
+        if cursor.rowcount == 0:
+            raise ValueError("Tag tidak ditemukan.")
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def update_book_details(
+    book_id, title, author, publisher, synopsis, cover_data, tags=()
+):
     title = title.strip()
     if not title:
         raise ValueError("Judul buku wajib diisi.")
+    normalized_tags = []
+    seen_tags = set()
+    for tag in tags:
+        name = tag.strip()
+        if not name:
+            continue
+        if len(name) > 60:
+            raise ValueError("Nama tag maksimal 60 karakter.")
+        normalized_name = name.casefold()
+        if normalized_name not in seen_tags:
+            normalized_tags.append(name)
+            seen_tags.add(normalized_name)
 
     connection = connect_database()
     try:
@@ -489,13 +641,28 @@ def update_book_details(book_id, title, author, publisher, synopsis, cover_data)
                 synopsis.strip() or None, cover_data, book_id,
             ),
         )
-        if cursor.rowcount == 0:
+        cursor.execute("SELECT id_buku FROM buku_digital WHERE id_buku = %s", (book_id,))
+        if cursor.fetchone() is None:
+            raise ValueError("Buku tidak ditemukan.")
+        tag_ids = []
+        for name in normalized_tags:
             cursor.execute(
-                "SELECT id_buku FROM buku_digital WHERE id_buku = %s",
-                (book_id,),
+                "SELECT id_tag FROM tag_buku WHERE nama_tag = %s", (name,)
             )
-            if cursor.fetchone() is None:
-                raise ValueError("Buku tidak ditemukan.")
+            tag = cursor.fetchone()
+            if tag is None:
+                cursor.execute(
+                    "INSERT INTO tag_buku (nama_tag) VALUES (%s)", (name,)
+                )
+                tag_ids.append(cursor.lastrowid)
+            else:
+                tag_ids.append(tag[0])
+        cursor.execute("DELETE FROM buku_tag WHERE id_buku = %s", (book_id,))
+        if tag_ids:
+            cursor.executemany(
+                "INSERT INTO buku_tag (id_buku, id_tag) VALUES (%s, %s)",
+                [(book_id, tag_id) for tag_id in tag_ids],
+            )
         connection.commit()
         return "Data buku berhasil diperbarui."
     finally:
@@ -583,10 +750,21 @@ def update_book_stock(book_id, stock):
         connection.close()
 
 
-def update_loan(user_id, book_id, action):
+def update_loan(user_id, book_id, action, rental_days=7):
+    if action not in ("borrow", "return"):
+        raise ValueError("Jenis tindakan peminjaman tidak valid.")
+    if action == "borrow" and (
+        isinstance(rental_days, bool)
+        or not isinstance(rental_days, int)
+        or not 1 <= rental_days <= 7
+    ):
+        raise ValueError("Durasi peminjaman harus antara 1 dan 7 hari.")
+
     connection = connect_database()
     try:
         cursor = connection.cursor()
+        if _expire_overdue_loans(cursor):
+            connection.commit()
         if action == "borrow":
             cursor.execute(
                 "SELECT jumlah_stok FROM buku_digital "
@@ -615,7 +793,7 @@ def update_loan(user_id, book_id, action):
             if borrowed_count >= book[0]:
                 return False, "Semua salinan buku ini sedang dipinjam."
 
-            due_date = (date.today() + timedelta(days=7)).isoformat()
+            due_date = (date.today() + timedelta(days=rental_days)).isoformat()
             cursor.execute(
                 """
                 INSERT INTO peminjaman

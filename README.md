@@ -59,7 +59,8 @@ python main.py
 
 Aplikasi memakai data pengguna, buku, dan peminjaman dari SQL dump yang diimpor.
 Saat terhubung ke database lama, aplikasi menambahkan kolom yang diperlukan,
-termasuk `cover_data`, `file_data`, `sinopsis`, `jumlah_stok`, dan `password_hash`.
+termasuk `cover_data`, `file_data`, `sinopsis`, `jumlah_stok`, dan `password_hash`,
+serta tabel `tag_buku` dan `buku_tag`.
 Kolom path file dari database lama akan dipindahkan ke BLOB jika file asalnya
 masih tersedia, lalu kolom path lama dihapus. Jika file lama tidak ditemukan,
 aplikasi menampilkan error agar path tersebut dapat dipulihkan atau dibersihkan
@@ -70,14 +71,23 @@ MySQL/MariaDB berjalan dan database serta tabel hasil impor tersedia.
 
 ## Fitur
 
+- Antarmuka terang dengan aksen indigo-navy, header dan panel yang rapi,
+  tabel admin bergaris selang-seling, serta tipografi Calibri dan Bahnschrift
+  (otomatis memakai Segoe UI bila font tersebut tidak tersedia).
 - Katalog buku berbentuk grid dengan pencarian dan filter buku tersedia atau
   sedang dipinjam.
-- Peminjaman selama tujuh hari, pengembalian, serta membuka file buku yang
-  sudah dipinjam. Admin dapat mengatur stok tiap buku; jumlah peminjaman aktif
-  tidak dapat melebihi stok yang tersedia.
+- Peminjaman dengan pilihan durasi 1–7 hari, pengembalian otomatis saat
+  tenggat tercapai, serta membuka file buku yang sudah dipinjam. Admin dapat
+  mengatur stok tiap buku; jumlah peminjaman aktif tidak dapat melebihi stok
+  yang tersedia.
+- Detail buku menggunakan bagian **Deskripsi Materi Pembelajaran** agar sesuai
+  untuk buku akademik dan bahan ajar. Admin dapat membuat, mengganti nama, dan
+  menghapus tag materi, lalu memilih beberapa tag untuk setiap buku melalui
+  popup detail; tag juga dapat digunakan dalam pencarian katalog.
 - Panel admin untuk menambah buku dan mengubah judul, penulis, penerbit,
-  sinopsis, serta sampul melalui jendela detail. Admin juga dapat mengatur stok,
-  mengganti PDF, dan menghapus buku yang belum memiliki riwayat pinjaman. PDF
+  sinopsis, sampul, stok, dan PDF, serta menghapus buku melalui satu jendela
+  detail. Form tambah buku dan pengelolaan pengguna juga dibuka sebagai popup.
+  Buku yang belum memiliki riwayat pinjaman dapat dihapus. PDF
   dan sampul disimpan sebagai `LONGBLOB` di MySQL, sehingga ikut tersimpan saat
   database diekspor; saat dibaca, aplikasi mengekstrak salinan sementara PDF
   untuk pembaca di komputer.
