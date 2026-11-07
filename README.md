@@ -4,20 +4,19 @@ Aplikasi perpustakaan desktop sederhana dengan Python, Tkinter, dan MySQL/MariaD
 
 ## Menjalankan aplikasi
 
-Gunakan Python 3.8 atau lebih baru. Buat database bernama
-`db_perpustakaan_digital`, lalu impor `db_perpustakaan_digital.sql` ke database
-tersebut melalui tab **Import** di phpMyAdmin. Untuk membuat databasenya dari
-PowerShell:
+Gunakan Python 3.8 atau lebih baru. Impor `db_perpustakaan_digital.sql` melalui
+tab **Import** di phpMyAdmin. SQL dump membuat database, tabel, relasi, dan
+data contoh secara berurutan. Dari Command Prompt, dump juga dapat dijalankan
+dengan perintah:
 
-```powershell
-mysql -u root -p -e "CREATE DATABASE db_perpustakaan_digital"
+```cmd
+mysql -u root -p < db_perpustakaan_digital.sql
 ```
 
-Setelah mengimpor SQL, pasang dependency dan jalankan aplikasi:
+Setelah mengimpor SQL, pasang dependency:
 
 ```powershell
 python -m pip install -r requirements.txt
-python main.py
 ```
 
 File `test.py` tetap dapat digunakan sebagai launcher lama. UI dibagi ke
@@ -36,11 +35,36 @@ $env:MYSQL_DATABASE = "db_perpustakaan_digital"
 python main.py
 ```
 
+### Akun contoh
+
+SQL dump membuat akun demo berikut. Masuk dengan NIM dan password yang sesuai:
+
+| Nama | Peran | NIM | Password |
+|---|---|---|---|
+| Admin 1 | Admin | `2026001` | `Admin123!` |
+| User 1 | Siswa | `2026002` | `User123!` |
+| User 2 | Siswa | `2026003` | `User123!` |
+| User 3 | Siswa | `2026004` | `User123!` |
+
+Password di database disimpan sebagai hash. Ini adalah kredensial demo untuk
+praktikum; admin dapat mengatur password lain melalui tab **Pengguna**.
+Menjalankan ulang SQL dump akan mengatur ulang nama, peran, dan password akun
+demo tersebut.
+
+Jalankan aplikasi dengan:
+
+```powershell
+python main.py
+```
+
 Aplikasi memakai data pengguna, buku, dan peminjaman dari SQL dump yang diimpor.
-Jika diperlukan, aplikasi menambahkan kolom opsional `cover_buku` ke database
-lama dan kolom `file_data` untuk menyimpan isi PDF pada database lama. Dump
-terbaru menyertakan PDF contoh singkat untuk ketiga buku awal; ganti file contoh
-tersebut dengan PDF yang ingin digunakan melalui panel admin.
+Saat terhubung ke database lama, aplikasi menambahkan kolom yang diperlukan,
+termasuk `cover_data`, `file_data`, `sinopsis`, `jumlah_stok`, dan `password_hash`.
+Kolom path file dari database lama akan dipindahkan ke BLOB jika file asalnya
+masih tersedia, lalu kolom path lama dihapus. Jika file lama tidak ditemukan,
+aplikasi menampilkan error agar path tersebut dapat dipulihkan atau dibersihkan
+terlebih dahulu. PDF dan sampul pada data contoh dibiarkan kosong agar SQL mudah
+dibaca; admin dapat menambah file melalui panel aplikasi.
 Jika koneksi gagal, aplikasi menampilkan detail error MySQL; pastikan layanan
 MySQL/MariaDB berjalan dan database serta tabel hasil impor tersedia.
 
@@ -49,27 +73,33 @@ MySQL/MariaDB berjalan dan database serta tabel hasil impor tersedia.
 - Katalog buku berbentuk grid dengan pencarian dan filter buku tersedia atau
   sedang dipinjam.
 - Peminjaman selama tujuh hari, pengembalian, serta membuka file buku yang
-  sudah dipinjam.
-- Panel admin untuk menambah buku beserta file dan sampulnya, serta menghapus
-  buku yang belum memiliki riwayat pinjaman. Admin juga dapat mengganti PDF
-  pada buku terpilih tanpa mengubah metadata atau riwayat peminjaman. PDF
-  disimpan sebagai `LONGBLOB` di MySQL, sehingga ikut tersimpan saat database
-  diekspor; saat dibaca, aplikasi mengekstrak salinan sementara untuk pembaca
-  PDF di komputer.
-- Pilih akun dari tabel `pengguna` pada layar awal. Peran `Admin-CRUD` membuka
-  panel admin; peran `Siswa-Rent` membuka katalog siswa.
+  sudah dipinjam. Admin dapat mengatur stok tiap buku; jumlah peminjaman aktif
+  tidak dapat melebihi stok yang tersedia.
+- Panel admin untuk menambah buku dan mengubah judul, penulis, penerbit,
+  sinopsis, serta sampul melalui jendela detail. Admin juga dapat mengatur stok,
+  mengganti PDF, dan menghapus buku yang belum memiliki riwayat pinjaman. PDF
+  dan sampul disimpan sebagai `LONGBLOB` di MySQL, sehingga ikut tersimpan saat
+  database diekspor; saat dibaca, aplikasi mengekstrak salinan sementara PDF
+  untuk pembaca di komputer.
+- Masuk dan daftar menggunakan NIM dan password. Akun baru otomatis menjadi
+  siswa. Admin dapat mengatur atau mereset password serta mengubah peran akun
+  melalui jendela pengelolaan di tab **Pengguna**, tempat admin juga dapat
+  mereset password; admin terakhir tidak dapat diturunkan perannya. Minta admin
+  mengatur password untuk akun yang sudah ada di database.
 - Sampul PNG/GIF ditampilkan langsung; dukungan sampul JPEG tersedia jika Pillow
   terpasang. Tanpa sampul yang dapat dibaca, katalog menampilkan ilustrasi
   pengganti.
+- Detail buku menampilkan sampul di kiri dan informasi serta sinopsis di kanan.
 
-### Menyimpan PDF di dalam database
+### Menyimpan PDF dan sampul di dalam database
 
-Impor SQL dump untuk mendapatkan tiga PDF contoh bawaan. Tambahkan buku atau
-gunakan **Ganti PDF buku terpilih** untuk menyimpan PDF lain ke kolom
-`file_data`, bukan hanya menyimpan path file. Setelah itu, gunakan **Export**
-di phpMyAdmin untuk membuat dump yang menyertakan PDF.
+Dump SQL menyediakan tiga data buku contoh tanpa file PDF atau sampul. Tambahkan
+buku atau gunakan **Ganti PDF buku terpilih** untuk menyimpan PDF ke kolom
+`file_data`, bukan hanya menyimpan path file. Sampul yang dipilih saat
+menambahkan buku disimpan sebagai bytes di `cover_data`. Setelah itu, gunakan
+**Export** di phpMyAdmin untuk membuat dump yang menyertakan PDF dan sampul.
 
-Menyimpan BLOB praktis untuk koleksi kecil atau PDF berukuran wajar, tetapi
-membuat database dan file export membesar. Untuk PDF besar, batas
+Menyimpan BLOB praktis untuk koleksi kecil atau file berukuran wajar, tetapi
+membuat database dan file export membesar. Untuk file besar, batas
 `max_allowed_packet` MySQL/MariaDB dan batas upload phpMyAdmin mungkin perlu
 ditingkatkan.
