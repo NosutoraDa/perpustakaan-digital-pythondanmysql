@@ -10,7 +10,6 @@ from database import (
     connect_database,
     create_tag,
     delete_tag,
-    get_all_tags,
     get_admin_book,
     get_book_tags,
     get_users,
@@ -150,7 +149,7 @@ class AdminPageMixin:
         try:
             book = get_admin_book(int(selection[0]))
             assigned_tags = get_book_tags(int(selection[0]))
-            available_tags = []
+            available_tags = assigned_tags
         except (ValueError, mysql.connector.Error) as error:
             messagebox.showerror("Gagal membuka buku", str(error))
             return
@@ -269,17 +268,17 @@ class AdminPageMixin:
         tag_listbox.pack(in_=tag_list_frame, side="left", fill="both", expand=True)
         tag_scrollbar.pack(in_=tag_list_frame, side="right", fill="y")
 
-        def refresh_tag_choices():
+        def refresh_tag_choices(select_name=None):
             nonlocal available_tags
             selected_ids = {
                 available_tags[index][0]
                 for index in tag_listbox.curselection()
             }
-            available_tags = get_all_tags()
+            available_tags = get_book_tags(int(book[0]))
             tag_listbox.delete(0, tk.END)
             for tag_id, name in available_tags:
                 tag_listbox.insert(tk.END, name)
-                if tag_id in selected_ids:
+                if name == select_name or tag_id in selected_ids:
                     tag_listbox.selection_set(tk.END)
 
         def selected_tag_names():
@@ -298,7 +297,7 @@ class AdminPageMixin:
 
         self.make_button(
             tag_frame, "Kelola tag", lambda: self.manage_book_tags(
-                dialog, refresh_tag_choices
+                dialog, int(book[0]), refresh_tag_choices
             ),
         ).pack(anchor="e", pady=(5, 0))
         cover_actions = tk.Frame(body, bg=PANEL)
@@ -400,7 +399,7 @@ class AdminPageMixin:
             actions, "Tutup", dialog.destroy,
         ).pack(side="right")
 
-    def manage_book_tags(self, parent, on_change):
+    def manage_book_tags(self, parent, book_id, on_change):
         manager = tk.Toplevel(parent)
         manager.title("Kelola tag materi")
         manager.configure(bg=PANEL)
@@ -417,7 +416,7 @@ class AdminPageMixin:
         ).pack(anchor="w", pady=(0, 6))
         tk.Label(
             content,
-            text="Tag yang dihapus akan dilepas dari semua buku.",
+            text="Tag disimpan khusus untuk buku ini.",
             bg=PANEL, fg=MUTED, font=(self.font_body, 9),
         ).pack(anchor="w", pady=(0, 12))
 
@@ -443,7 +442,7 @@ class AdminPageMixin:
 
         def refresh_manager(select_name=None):
             nonlocal manager_tags
-            manager_tags = get_all_tags()
+            manager_tags = get_book_tags(book_id)
             tags_list.delete(0, tk.END)
             for tag in manager_tags:
                 name = tag[1]
@@ -451,7 +450,7 @@ class AdminPageMixin:
                 if name == select_name:
                     tags_list.selection_set(tk.END)
                     tags_list.see(tk.END)
-            on_change()
+            on_change(select_name)
 
         def selected_tag():
             selection = tags_list.curselection()
@@ -480,10 +479,10 @@ class AdminPageMixin:
                 )
 
         def copy_selected_tag_name(_event=None):
-                selection = tags_list.curselection()
-                if selection:
-                    name_entry.delete(0, tk.END)
-                    name_entry.insert(0, tags_list.get(selection[0]))
+            selection = tags_list.curselection()
+            if selection:
+                name_entry.delete(0, tk.END)
+                name_entry.insert(0, tags_list.get(selection[0]))
 
         tags_list.bind("<<ListboxSelect>>", copy_selected_tag_name)
 
@@ -495,7 +494,7 @@ class AdminPageMixin:
                 )
                 return
             run_tag_change(
-                lambda: create_tag(name),
+                lambda: create_tag(book_id, name),
                 "Tag berhasil ditambahkan.",
                 select_name=name,
             )
@@ -524,7 +523,7 @@ class AdminPageMixin:
                 return
             if not messagebox.askyesno(
                 "Hapus tag",
-                f'Hapus tag "{selected[1]}" dari semua buku?',
+                f'Hapus tag "{selected[1]}" dari buku ini?',
                 parent=manager,
             ):
                 return
