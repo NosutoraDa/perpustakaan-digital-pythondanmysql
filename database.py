@@ -645,6 +645,17 @@ def get_book_tags(book_id):
         connection.close()
 
 
+def get_all_book_tags():
+    """Return the distinct tags currently assigned to books."""
+    connection = connect_database()
+    try:
+        cursor = connection.cursor()
+        cursor.execute("SELECT DISTINCT nama_tag FROM tag_buku ORDER BY nama_tag")
+        return [row[0] for row in cursor.fetchall()]
+    finally:
+        connection.close()
+
+
 def create_tag(book_id, name):
     name = name.strip()
     if not name or len(name) > 60:
