@@ -4,14 +4,15 @@ Aplikasi perpustakaan desktop sederhana dengan Python, Tkinter, dan MySQL/MariaD
 
 ## Menjalankan aplikasi
 
-Gunakan Python 3.8 atau lebih baru. Impor `db_perpustakaan_digital.sql` melalui
-tab **Import** di phpMyAdmin. SQL dump membuat database, tabel, relasi, dan
-data contoh secara berurutan. Dari Command Prompt, dump juga dapat dijalankan
-dengan perintah:
+Gunakan Python 3.8 atau lebih baru. Untuk menyiapkan database, impor
+`db_perpustakaan_digital.sql` melalui phpMyAdmin:
 
-```cmd
-mysql -u root -p < db_perpustakaan_digital.sql
-```
+1. Jalankan MySQL/MariaDB dan buka phpMyAdmin.
+2. Buka tab **Import**.
+3. Pilih `db_perpustakaan_digital.sql`, lalu klik **Import** atau **Go**.
+
+Dump ini membuat database `db_perpustakaan_digital`, tabel, relasi, dan data
+contoh.
 
 Setelah mengimpor SQL, pasang dependency:
 
