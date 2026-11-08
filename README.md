@@ -20,8 +20,7 @@ Setelah mengimpor SQL, pasang dependency:
 python -m pip install -r requirements.txt
 ```
 
-File `test.py` tetap dapat digunakan sebagai launcher lama. UI dibagi ke
-`pages/login_page.py`, `pages/student_page.py`, dan `pages/admin_page.py`;
+UI dibagi ke `pages/login_page.py`, `pages/student_page.py`, dan `pages/admin_page.py`;
 operasi database bersama berada di `database.py`.
 
 Atur variabel koneksi sebelum menjalankan aplikasi jika konfigurasi berbeda
