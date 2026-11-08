@@ -1,4 +1,4 @@
-# Ruang Baca - Perpustakaan Digital
+# ERAUTAMA - Perpustakaan Digital
 
 Aplikasi perpustakaan desktop sederhana dengan Python, Tkinter, dan MySQL/MariaDB.
 

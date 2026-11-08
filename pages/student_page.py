@@ -9,7 +9,7 @@ from tkinter import messagebox, ttk
 
 import mysql.connector
 
-from database import get_book_file, get_books, update_loan
+from database import get_all_book_tags, get_book_file, get_books, update_loan
 from ui_theme import (
     ACCENT,
     ACCENT_LIGHT,
@@ -36,11 +36,27 @@ class StudentPageMixin:
         self.book_catalogue_data = None
         self.cover_image_cache = {}
         self.search_after_id = None
+        self.active_tag = None
         self.add_sidebar_item(
             "Koleksi Buku",
-            lambda: self.select_sidebar_item("Koleksi Buku"),
+            self.show_all_books,
             selected=True,
         )
+        tk.Label(
+            self.sidebar, text="GENRE", bg=PANEL, fg=MUTED,
+            font=(self.font_display, 9, "bold"),
+        ).pack(anchor="w", padx=18, pady=(22, 9))
+        self.genre_tags = get_all_book_tags()
+        if self.genre_tags:
+            for tag in self.genre_tags:
+                self.add_sidebar_item(
+                    tag, lambda value=tag: self.set_active_tag(value),
+                )
+        else:
+            tk.Label(
+                self.sidebar, text="Belum ada tag", bg=PANEL, fg=MUTED,
+                font=(self.font_body, 9),
+            ).pack(anchor="w", padx=18, pady=4)
 
         page_title = tk.Label(
             self.workspace, text="Koleksi Buku", bg=BACKGROUND, fg=TEXT,
@@ -153,6 +169,16 @@ class StudentPageMixin:
             )
         self.render_book_grid()
 
+    def set_active_tag(self, tag):
+        self.active_tag = tag
+        self.select_sidebar_item(tag)
+        self.render_book_grid()
+
+    def show_all_books(self):
+        self.active_tag = None
+        self.select_sidebar_item("Koleksi Buku")
+        self.render_book_grid()
+
     def render_book_grid(self):
         if not hasattr(self, "grid_frame") or not self.grid_frame.winfo_exists():
             return
@@ -164,6 +190,13 @@ class StudentPageMixin:
             self.after_cancel(self.search_after_id)
             self.search_after_id = None
         books = self.book_catalogue_data
+        if self.active_tag:
+            books = [
+                book for book in books
+                if self.active_tag.casefold() in {
+                    tag.strip().casefold() for tag in (book[11] or "").split(",")
+                }
+            ]
         search = self.search_var.get().strip().casefold()
         if search:
             books = [
