@@ -4,15 +4,92 @@ Aplikasi perpustakaan desktop sederhana dengan Python, Tkinter, dan MySQL/MariaD
 
 ## Menjalankan aplikasi
 
-Gunakan Python 3.8 atau lebih baru. Untuk menyiapkan database, impor
-`db_perpustakaan_digital.sql` melalui phpMyAdmin:
+Gunakan Python 3.8 atau lebih baru. Pilih salah satu dump SQL berikut:
 
-1. Jalankan MySQL/MariaDB dan buka phpMyAdmin.
-2. Buka tab **Import**.
-3. Pilih `db_perpustakaan_digital.sql`, lalu klik **Import** atau **Go**.
+- `db_perpustakaan_digital (without_books).sql` (sekitar 4,5 KB): skema dan data
+  contoh tanpa BLOB buku berukuran besar. Cocok untuk impor melalui phpMyAdmin.
+- `db_perpustakaan_digital (with_books).sql` (sekitar 207 MB): termasuk file
+  buku dalam database. phpMyAdmin mungkin menolak unggahan karena batas ukuran;
+  gunakan impor command line di bawah jika itu terjadi.
 
-Dump ini membuat database `db_perpustakaan_digital`, tabel, relasi, dan data
-contoh.
+Untuk mencoba impor dump besar lewat phpMyAdmin, batas upload PHP juga harus
+mencukupi. Di XAMPP Control Panel, klik **Config** pada baris Apache, buka
+`php.ini`, lalu atur `upload_max_filesize` dan `post_max_size` ke setidaknya
+`256M`. Simpan dan mulai ulang Apache. Batas `max_allowed_packet` MariaDB di
+bawah ini tetap harus cukup; jika phpMyAdmin masih menolak file atau waktu
+impor habis, gunakan command line.
+
+Kedua dump membuat database `db_perpustakaan_digital`, tabel, relasi, dan data
+contoh. Jangan mengimpor dump berulang kali ke database yang sama tanpa
+menghapus tabel lama terlebih dahulu.
+
+### Impor dump besar di Windows dengan XAMPP
+
+Perintah ini memakai lokasi XAMPP `D:\xampp` dan file dump di folder proyek.
+Buka **Command Prompt** (bukan prompt `MariaDB>`), lalu jalankan:
+
+```bat
+"D:\xampp\mysql\bin\mysql.exe" -u root -p < "D:\MDaffa\Kuliah Praktek\tugas-akhir-semester-1-database\perpustakaan-digital-pythondanmysql\db_perpustakaan_digital (with_books).sql"
+```
+
+Jika file dump berada di lokasi lain, salin path lengkapnya dari File Explorer:
+klik kanan file `.sql` sambil menekan **Shift**, pilih **Copy as path**, lalu
+ganti path file SQL di ujung perintah dengan path yang disalin. Pertahankan tanda
+kutip di sekitar path karena nama folder atau file bisa mengandung spasi.
+
+Masukkan password MariaDB saat diminta. Jika akun `root` tidak memakai password,
+tekan Enter. Sesuaikan lokasi executable atau file SQL jika foldernya berbeda.
+
+Jika muncul `ERROR 1153 ... bigger than 'max_allowed_packet'`, tingkatkan batas
+server MariaDB:
+
+1. Di XAMPP Control Panel, hentikan **MySQL**, lalu klik **Config** di baris
+   MySQL dan buka `my.ini`.
+2. Di bagian `[mysqld]`, tambahkan atau ubah baris menjadi:
+
+   ```ini
+   max_allowed_packet=512M
+   ```
+
+3. Simpan file dan mulai ulang MySQL di XAMPP.
+4. Di phpMyAdmin, buka tab **SQL** dan periksa nilainya:
+
+   ```sql
+   SHOW GLOBAL VARIABLES LIKE 'max_allowed_packet';
+   ```
+
+   Nilai yang diharapkan adalah `536870912` byte. Jika perlu, root dapat
+   menaikkannya untuk sesi server saat ini dengan:
+
+   ```sql
+   SET GLOBAL max_allowed_packet = 536870912;
+   ```
+
+   Pengaturan `SET GLOBAL` berlaku sampai server dimulai ulang; `my.ini`
+   menyimpan pengaturan untuk restart berikutnya. Opsi
+   `--max-allowed-packet=512M` pada perintah impor hanya mengatur batas klien,
+   jadi batas server tetap perlu disetel.
+
+Jika impor sebelumnya gagal, sebagian tabel mungkin sudah dibuat. Sebelum
+mengulang impor, pilih `db_perpustakaan_digital` di phpMyAdmin, buka tab **SQL**,
+dan jalankan perintah berikut untuk menghapus tabel parsial. **Ini menghapus isi
+keempat tabel tersebut.**
+
+```sql
+SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS tag_buku, peminjaman, pengguna, buku_digital;
+SET FOREIGN_KEY_CHECKS = 1;
+```
+
+Kemudian jalankan kembali perintah impor command line di atas. File `.ibd` yang
+terlihat di folder `xampp\mysql\data` adalah berkas penyimpanan internal
+MariaDB; jangan hapus atau pindahkan saat server berjalan. phpMyAdmin membaca
+skema dan metadata yang dikelola server, bukan folder tersebut secara langsung.
+Jika `DROP DATABASE` gagal dengan `ERROR 1010` atau `Directory not empty`, cek
+di phpMyAdmin dengan `SHOW VARIABLES LIKE 'datadir';` untuk memastikan server
+memakai folder data XAMPP yang sama. Jangan menghapus isi folder database secara
+manual saat MySQL berjalan; buat salinan cadangan dan perbaiki tabel melalui
+MariaDB atau minta bantuan sebelum mengubah berkas data internal.
 
 Setelah mengimpor SQL, pasang dependency:
 
