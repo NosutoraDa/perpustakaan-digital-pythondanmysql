@@ -136,14 +136,26 @@ def _validate_password(password):
         )
 
 
+def _is_admin(cursor, user_id):
+    cursor.execute(
+        "SELECT peran FROM pengguna WHERE id_pengguna = %s FOR UPDATE",
+        (user_id,),
+    )
+    user = cursor.fetchone()
+    return user is not None and user[0] == "Admin-CRUD"
+
+
+def _validate_tag_name(name):
+    name = name.strip()
+    if not name or len(name) > 60:
+        raise ValueError("Nama tag harus berisi 1–60 karakter.")
+    return name
+
+
 def connect_database():
     return mysql.connector.connect(
-        host=os.environ.get("MYSQL_HOST", "localhost"),
-        port=int(os.environ.get("MYSQL_PORT", "3306")),
-        connection_timeout=int(os.environ.get("MYSQL_CONNECT_TIMEOUT", "5")),
-        user=os.environ.get("MYSQL_USER", "root"),
-        password=os.environ.get("MYSQL_PASSWORD", ""),
         database=os.environ.get("MYSQL_DATABASE", "db_perpustakaan_digital"),
+        **_database_settings(),
     )
 
 
@@ -485,9 +497,13 @@ def authenticate_user(nim, password):
             (nim.strip(),),
         )
         user = cursor.fetchone()
-        if user is None or user[3] is None or not _verify_password(password, user[3]):
+        if user is None:
             return None
-        return user[:3]
+
+        user_id, name, role, password_hash = user
+        if password_hash is None or not _verify_password(password, password_hash):
+            return None
+        return user_id, name, role
     finally:
         connection.close()
 
@@ -539,12 +555,7 @@ def set_user_password(actor_id, target_id, password):
     connection = connect_database()
     try:
         cursor = connection.cursor()
-        cursor.execute(
-            "SELECT peran FROM pengguna WHERE id_pengguna = %s FOR UPDATE",
-            (actor_id,),
-        )
-        actor = cursor.fetchone()
-        if actor is None or actor[0] != "Admin-CRUD":
+        if not _is_admin(cursor, actor_id):
             return False, "Hanya admin yang dapat mengatur password pengguna."
 
         cursor.execute(
@@ -581,7 +592,7 @@ def get_users():
         connection.close()
 
 
-def update_user_account(actor_id, target_id, role, password=None):
+def _change_user_account(actor_id, target_id, role, password, role_only):
     if role not in ("Admin-CRUD", "Siswa-Rent"):
         raise ValueError("Peran pengguna tidak valid.")
     if password is not None:
@@ -590,12 +601,9 @@ def update_user_account(actor_id, target_id, role, password=None):
     connection = connect_database()
     try:
         cursor = connection.cursor()
-        cursor.execute(
-            "SELECT peran FROM pengguna WHERE id_pengguna = %s FOR UPDATE",
-            (actor_id,),
-        )
-        actor = cursor.fetchone()
-        if actor is None or actor[0] != "Admin-CRUD":
+        if not _is_admin(cursor, actor_id):
+            if role_only:
+                return False, "Hanya admin yang dapat mengubah peran pengguna."
             return False, "Hanya admin yang dapat mengubah akun pengguna."
 
         cursor.execute(
@@ -606,6 +614,8 @@ def update_user_account(actor_id, target_id, role, password=None):
         target = cursor.fetchone()
         if target is None:
             return False, "Pengguna tidak ditemukan."
+        if role_only and target[0] == role:
+            return True, "Peran pengguna tidak berubah."
         if (
             role == "Admin-CRUD"
             and target[0] != "Admin-CRUD"
@@ -637,57 +647,23 @@ def update_user_account(actor_id, target_id, role, password=None):
                 (role, _hash_password(password), target_id),
             )
         connection.commit()
+        if role_only:
+            return True, "Peran pengguna berhasil diperbarui."
         return True, "Data pengguna berhasil diperbarui."
     finally:
         connection.close()
 
 
+def update_user_account(actor_id, target_id, role, password=None):
+    return _change_user_account(
+        actor_id, target_id, role, password, role_only=False
+    )
+
+
 def set_user_role(actor_id, target_id, role):
-    if role not in ("Admin-CRUD", "Siswa-Rent"):
-        raise ValueError("Peran pengguna tidak valid.")
-
-    connection = connect_database()
-    try:
-        cursor = connection.cursor()
-        cursor.execute(
-            "SELECT peran FROM pengguna WHERE id_pengguna = %s FOR UPDATE",
-            (actor_id,),
-        )
-        actor = cursor.fetchone()
-        if actor is None or actor[0] != "Admin-CRUD":
-            return False, "Hanya admin yang dapat mengubah peran pengguna."
-
-        cursor.execute(
-            "SELECT peran, password_hash FROM pengguna "
-            "WHERE id_pengguna = %s FOR UPDATE",
-            (target_id,),
-        )
-        target = cursor.fetchone()
-        if target is None:
-            return False, "Pengguna tidak ditemukan."
-        if target[0] == role:
-            return True, "Peran pengguna tidak berubah."
-        if role == "Admin-CRUD" and target[1] is None:
-            return False, "Pengguna harus membuat akun dan password sebelum menjadi admin."
-        if target_id == actor_id and role != "Admin-CRUD":
-            return False, "Gunakan akun admin lain untuk mengubah peran Anda."
-
-        if role == "Siswa-Rent" and target[0] == "Admin-CRUD":
-            cursor.execute(
-                "SELECT id_pengguna FROM pengguna "
-                "WHERE peran = 'Admin-CRUD' FOR UPDATE"
-            )
-            if len(cursor.fetchall()) <= 1:
-                return False, "Admin terakhir tidak dapat diubah menjadi siswa."
-
-        cursor.execute(
-            "UPDATE pengguna SET peran = %s WHERE id_pengguna = %s",
-            (role, target_id),
-        )
-        connection.commit()
-        return True, "Peran pengguna berhasil diperbarui."
-    finally:
-        connection.close()
+    return _change_user_account(
+        actor_id, target_id, role, password=None, role_only=True
+    )
 
 
 def get_books(user_id=None):
@@ -790,9 +766,7 @@ def get_all_book_tags():
 
 
 def create_tag(book_id, name):
-    name = name.strip()
-    if not name or len(name) > 60:
-        raise ValueError("Nama tag harus berisi 1–60 karakter.")
+    name = _validate_tag_name(name)
 
     connection = connect_database()
     try:
@@ -808,9 +782,7 @@ def create_tag(book_id, name):
 
 
 def rename_tag(tag_id, name):
-    name = name.strip()
-    if not name or len(name) > 60:
-        raise ValueError("Nama tag harus berisi 1–60 karakter.")
+    name = _validate_tag_name(name)
 
     connection = connect_database()
     try:
@@ -1002,8 +974,7 @@ def update_loan(user_id, book_id, action, rental_days=7):
                 "AND id_buku = %s AND status = 'Aktif'",
                 (user_id, book_id),
             )
-            active_loans = cursor.fetchall()
-            if active_loans:
+            if cursor.fetchone() is not None:
                 return False, "Buku ini sudah ada di daftar pinjaman Anda."
 
             cursor.execute(
