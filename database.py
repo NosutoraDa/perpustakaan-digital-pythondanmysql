@@ -196,6 +196,7 @@ def setup_database():
     connection = connect_database()
     try:
         cursor = connection.cursor(buffered=True)
+        _setup_user_passwords(connection, cursor)
         _seed_starter_users(cursor)
         cursor.execute(
             """
@@ -211,7 +212,6 @@ def setup_database():
             (connection.database,),
         )
         columns = {row[0] for row in cursor.fetchall()}
-        _setup_user_passwords(connection, cursor)
         if "file_data" not in columns:
             cursor.execute(
                 "ALTER TABLE buku_digital ADD COLUMN file_data LONGBLOB NULL"
