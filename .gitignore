@@ -2,3 +2,4 @@ __pycache__/
 *.py[cod]
 .venv/
 .uv-cache/
+db_perpustakaan_digital (with_books).sql
