@@ -163,7 +163,10 @@ def _initialize_database():
     server = mysql.connector.connect(**_database_settings())
     try:
         cursor = server.cursor()
-        cursor.execute("SET GLOBAL max_allowed_packet = 536870912")
+        try:
+            cursor.execute("SET GLOBAL max_allowed_packet = 536870912")
+        except mysql.connector.Error:
+            pass
         # The database name comes from configuration, so quote it as an identifier.
         quoted_name = "`" + database_name.replace("`", "``") + "`"
         cursor.execute(

@@ -26,6 +26,12 @@ menjalankan aplikasi. Akun MySQL harus memiliki izin membuat database dan tabel.
 
 ## 3. Pasang kebutuhan Python
 
+Paling praktis di Windows: buka folder proyek dan double-click
+`run.bat`. Launcher ini akan memasang paket Python yang dibutuhkan dan
+menjalankan aplikasi secara otomatis.
+
+Atau lakukan langkah manual berikut:
+
 Buka folder proyek di File Explorer. Klik bagian alamat folder di atas, ketik
 `cmd`, lalu tekan Enter. Di jendela Command Prompt yang terbuka, jalankan:
 

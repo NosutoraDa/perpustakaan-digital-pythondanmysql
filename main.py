@@ -17,10 +17,8 @@ def main():
         root.withdraw()
         messagebox.showerror(
             "Database setup failed",
-            "Could not prepare the library database. Make sure MySQL/MariaDB "
-            "is running and the MYSQL_HOST, "
-            "MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE "
-            "settings are correct.\n\n"
+            "Could not prepare the library database. Start MySQL/MariaDB "
+            "from XAMPP, then run the application again.\n\n"
             f"Details: {error}",
             parent=root,
         )
