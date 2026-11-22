@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from pathlib import Path
 
 import mysql.connector
+from book_seed_data import STARTER_BOOK_RECORDS
 
 
 PASSWORD_HASH_ITERATIONS = 600_000
@@ -89,6 +90,7 @@ VALUES
 """
 
 
+
 def _hash_password(password):
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac(
@@ -135,7 +137,7 @@ def _is_admin(cursor, user_id):
 def _validate_tag_name(name):
     name = name.strip()
     if not name or len(name) > 60:
-        raise ValueError("Nama tag harus berisi 1–60 karakter.")
+        raise ValueError("Nama tag harus berisi 1â€“60 karakter.")
     return name
 
 
@@ -302,6 +304,20 @@ def _seed_starter_books(cursor):
         statement = statement.strip()
         if statement.startswith("INSERT IGNORE INTO buku_digital"):
             cursor.execute(statement)
+    for book_id, title, encoded_statement, encoded_pdf, encoded_cover in STARTER_BOOK_RECORDS:
+        cursor.execute(base64.b64decode(encoded_statement).decode("utf-8"))
+        cursor.execute(
+            "UPDATE buku_digital "
+            "SET file_data = COALESCE(file_data, %s), "
+            "cover_data = COALESCE(cover_data, %s) "
+            "WHERE id_buku = %s AND judul_buku = %s",
+            (
+                base64.b64decode(encoded_pdf),
+                base64.b64decode(encoded_cover),
+                book_id,
+                title,
+            ),
+        )
 
 
 def _remove_demo_books(cursor):
@@ -452,7 +468,7 @@ def _setup_book_tags(connection, cursor):
 
 
 def _seed_starter_book_genres(cursor):
-    """Add the genre tags copied from the SQL dump for the two sample books."""
+    """Add genre tags copied from the SQL dump for the seeded books."""
     cursor.executemany(
         "INSERT IGNORE INTO tag_buku (id_buku, nama_tag) VALUES (%s, %s)",
         [
@@ -462,6 +478,12 @@ def _seed_starter_book_genres(cursor):
             (12, "Absurdism"),
             (12, "Classic Literature"),
             (12, "Psychological"),
+            (5, "Self-Improvement"),
+            (7, "Classic Literature"),
+            (8, "Fiksi"),
+            (8, "Psychological"),
+            (9, "Classic Literature"),
+            (9, "Psychologal"),
         ],
     )
 

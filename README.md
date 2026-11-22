@@ -12,11 +12,12 @@ Pastikan sudah terpasang:
 
 ## 2. Database otomatis disiapkan
 
-Pastikan MySQL/MariaDB dari XAMPP sedang berjalan. Saat pertama kali `main.py`
-dijalankan, aplikasi membuat database `db_perpustakaan_digital`, tabel, dan
-akun/data contoh dari SQL yang tertanam di `database.py`. Tidak perlu menyimpan
-atau mengimpor file SQL lewat phpMyAdmin atau Command Prompt. Data yang sudah ada
-tetap dipakai pada peluncuran berikutnya.
+Pastikan MySQL/MariaDB dari XAMPP sedang berjalan. Saat `main.py` dijalankan,
+aplikasi membuat database `db_perpustakaan_digital` dan tabel jika belum tersedia,
+lalu menambahkan akun dan data contoh yang belum ada. Skema dan dua buku awal
+berada di `database.py`; empat buku contoh beserta PDF dan sampulnya berada di
+`book_seed_data.py`. Simpan kedua file tersebut di folder yang sama. Tidak perlu
+mengimpor file SQL untuk menjalankan aplikasi.
 
 Secara bawaan aplikasi memakai `localhost:3306`, user `root`, dan password
 kosong. Jika MySQL memakai pengaturan berbeda, isi variabel `MYSQL_HOST`,
@@ -77,9 +78,11 @@ mengatur ulang data akun contoh. Admin bisa mengatur password akun melalui tab
 - PDF dan sampul yang ditambahkan admin disimpan di database.
 - Pengguna dapat mendaftar dengan NIM dan password; akun baru menjadi siswa.
 
-Dump `with_books` berisi perintah `INSERT` saja untuk data empat tabel, termasuk
-21 buku beserta file PDF-nya. Dump ini tidak membuat database atau tabel; jalankan
-aplikasi terlebih dahulu agar skema tabel tersedia. File dump tetap berukuran
-sekitar 207 MB karena menyimpan file buku. PDF dan sampul yang ditambahkan admin
-juga disimpan di database, sehingga ukuran database dan file hasil **Export**
-dapat menjadi besar.
+Dump SQL opsional tersedia di folder proyek. `db_perpustakaan_digital (with_books).sql`
+berisi empat buku pilihan dan PDF-nya tanpa sampul; ukurannya sekitar 38,7 MB.
+`db_perpustakaan_digital (without_book_files).sql` mempertahankan metadata buku
+dan tag tanpa PDF atau sampul. Dump `with_books` yang asli berisi 21 buku dengan
+PDF dan sampul, sehingga ukurannya sekitar 207 MB. Untuk penggunaan aplikasi
+biasa, jalankan `main.py`; data contoh akan disiapkan otomatis. PDF dan sampul
+yang ditambahkan admin disimpan di database, sehingga ukuran database dan file
+hasil **Export** dapat menjadi besar.
