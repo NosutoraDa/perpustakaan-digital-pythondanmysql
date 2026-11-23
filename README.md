@@ -90,4 +90,4 @@ Password contoh disimpan dalam bentuk hash di database. Mengimpor dump lagi akan
 
 ## Dump SQL (opsional)
 
-Dump SQL opsional tersedia di folder proyek. `db_perpustakaan_digital (with_books).sql` berisi empat buku pilihan dan PDF-nya tanpa sampul; ukurannya sekitar 38,7 MB. `db_perpustakaan_digital (without_book_files).sql` mempertahankan metadata buku dan tag tanpa PDF atau sampul. Dump `with_books` yang asli berisi 21 buku dengan PDF dan sampul, sehingga ukurannya sekitar 207 MB. Untuk penggunaan aplikasi biasa, jalankan `main.py`; data contoh akan disiapkan otomatis. PDF dan sampul yang ditambahkan admin disimpan di database, sehingga ukuran database dan file hasil **Export** dapat menjadi besar.
+Dump `with_books` yang asli berisi 21 buku dengan PDF dan sampul, sehingga ukurannya sekitar 207 MB. Untuk penggunaan aplikasi biasa, jalankan `main.py`; data contoh akan disiapkan otomatis. PDF dan sampul yang ditambahkan admin disimpan di database, sehingga ukuran database dan file hasil **Export** dapat menjadi besar.
