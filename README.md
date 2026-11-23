@@ -7,35 +7,23 @@ Aplikasi perpustakaan desktop yang dibuat dengan Python, Tkinter, dan MySQL/Mari
 Pastikan sudah terpasang:
 
 - Python 3.8 atau lebih baru.
-- XAMPP dengan MySQL aktif. Jalankan XAMPP Control Panel, lalu klik **Start**
-  pada baris **MySQL**.
+- XAMPP dengan MySQL aktif. Jalankan XAMPP Control Panel, lalu klik **Start** pada baris **MySQL**.
 
 ## 2. Database otomatis disiapkan
 
-Pastikan MySQL/MariaDB dari XAMPP sedang berjalan. Saat `main.py` dijalankan,
-aplikasi membuat database `db_perpustakaan_digital` dan tabel jika belum tersedia,
-lalu menambahkan akun dan data contoh yang belum ada. Skema dan dua buku awal
-berada di `database.py`; empat buku contoh beserta PDF dan sampulnya berada di
-`book_seed_data.py`. Simpan kedua file tersebut di folder yang sama. Tidak perlu
-mengimpor file SQL untuk menjalankan aplikasi.
+Pastikan MySQL/MariaDB dari XAMPP sedang berjalan. Saat `main.py` dijalankan, aplikasi membuat database `db_perpustakaan_digital` dan tabel jika belum tersedia, lalu menambahkan akun dan data contoh yang belum ada. Skema tabel berada di `database.py`, sedangkan data awal buku beserta PDF dan sampulnya berada di `book_seed_data.py`. Simpan kedua file tersebut di folder yang sama. Tidak perlu mengimpor file SQL untuk menjalankan aplikasi.
 
-Secara bawaan aplikasi memakai `localhost:3306`, user `root`, dan password
-kosong. Jika MySQL memakai pengaturan berbeda, isi variabel `MYSQL_HOST`,
-`MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, dan `MYSQL_DATABASE` sebelum
-menjalankan aplikasi. Akun MySQL harus memiliki izin membuat database dan tabel.
+Secara bawaan aplikasi memakai `localhost:3306`, user `root`, dan password kosong. Jika MySQL memakai pengaturan berbeda, isi variabel `MYSQL_HOST`, `MYSQL_PORT`, `MYSQL_USER`, `MYSQL_PASSWORD`, dan `MYSQL_DATABASE` sebelum menjalankan aplikasi. Akun MySQL harus memiliki izin membuat database dan tabel.
 
 ## 3. Pasang kebutuhan Python
 
-Paling praktis di Windows: buka folder proyek dan double-click
-`run.bat`. Launcher ini akan memasang paket Python yang dibutuhkan dan
-menjalankan aplikasi secara otomatis.
+Paling praktis di Windows: buka folder proyek dan double-click `run.bat`. Launcher ini akan memasang paket Python yang dibutuhkan dan menjalankan aplikasi secara otomatis.
 
 Atau lakukan langkah manual berikut:
 
-Buka folder proyek di File Explorer. Klik bagian alamat folder di atas, ketik
-`cmd`, lalu tekan Enter. Di jendela Command Prompt yang terbuka, jalankan:
+Buka folder proyek di File Explorer. Klik bagian alamat folder di atas, ketik `cmd`, lalu tekan Enter. Di jendela Command Prompt yang terbuka, jalankan:
 
-```powershell
+```
 python -m pip install -r requirements.txt
 ```
 
@@ -43,16 +31,13 @@ python -m pip install -r requirements.txt
 
 Di jendela Command Prompt atau PowerShell yang sama, jalankan:
 
-```powershell
+```
 python main.py
 ```
 
-Secara bawaan, aplikasi mencoba terhubung ke MySQL di `localhost`, port `3306`,
-dengan nama database `db_perpustakaan_digital`, user `root`, dan password kosong.
-Jika pengaturan MySQL Anda berbeda, isi variabel berikut sebelum menjalankan
-aplikasi. Ganti password contoh dengan password MySQL Anda:
+Secara bawaan, aplikasi mencoba terhubung ke MySQL di `localhost`, port `3306`, dengan nama database `db_perpustakaan_digital`, user `root`, dan password kosong. Jika pengaturan MySQL Anda berbeda, isi variabel berikut sebelum menjalankan aplikasi. Ganti password contoh dengan password MySQL Anda:
 
-```powershell
+```
 $env:MYSQL_HOST = "localhost"
 $env:MYSQL_PORT = "3306"
 $env:MYSQL_USER = "root"
@@ -65,16 +50,14 @@ python main.py
 
 Gunakan NIM dan password berikut untuk masuk:
 
-| Nama | Peran | NIM | Password |
-|---|---|---|---|
+| Nama    | Peran | NIM       | Password    |
+| ------- | ----- | --------- | ----------- |
 | Admin 1 | Admin | `2026001` | `Admin123!` |
-| User 1 | Siswa | `2026002` | `User123!` |
-| User 2 | Siswa | `2026003` | `User123!` |
-| User 3 | Siswa | `2026004` | `User123!` |
+| User 1  | Siswa | `2026002` | `User123!`  |
+| User 2  | Siswa | `2026003` | `User123!`  |
+| User 3  | Siswa | `2026004` | `User123!`  |
 
-Password contoh disimpan dalam bentuk hash di database. Mengimpor dump lagi akan
-mengatur ulang data akun contoh. Admin bisa mengatur password akun melalui tab
-**Pengguna**.
+Password contoh disimpan dalam bentuk hash di database. Mengimpor dump lagi akan mengatur ulang data akun contoh. Admin bisa mengatur password akun melalui tab **Pengguna**.
 
 ## Fitur utama
 
@@ -84,11 +67,27 @@ mengatur ulang data akun contoh. Admin bisa mengatur password akun melalui tab
 - PDF dan sampul yang ditambahkan admin disimpan di database.
 - Pengguna dapat mendaftar dengan NIM dan password; akun baru menjadi siswa.
 
-Dump SQL opsional tersedia di folder proyek. `db_perpustakaan_digital (with_books).sql`
-berisi empat buku pilihan dan PDF-nya tanpa sampul; ukurannya sekitar 38,7 MB.
-`db_perpustakaan_digital (without_book_files).sql` mempertahankan metadata buku
-dan tag tanpa PDF atau sampul. Dump `with_books` yang asli berisi 21 buku dengan
-PDF dan sampul, sehingga ukurannya sekitar 207 MB. Untuk penggunaan aplikasi
-biasa, jalankan `main.py`; data contoh akan disiapkan otomatis. PDF dan sampul
-yang ditambahkan admin disimpan di database, sehingga ukuran database dan file
-hasil **Export** dapat menjadi besar.
+## Aturan peminjaman
+
+- `jumlah_stok` pada setiap buku adalah batas jumlah siswa yang boleh meminjam buku itu pada waktu yang sama. Nilainya tidak berubah saat buku dipinjam atau dikembalikan.
+- Lama peminjaman dipilih siswa antara 1 sampai 7 hari.
+- Siswa tidak dapat meminjam buku yang sama lagi selama pinjamannya masih aktif.
+- Pinjaman yang sudah mencapai tenggat dikembalikan otomatis. Pemeriksaannya berjalan saat aplikasi dimulai, saat katalog dimuat, saat ada peminjaman, dan setiap tengah malam selama aplikasi terbuka.
+- Buku yang pernah dipinjam tidak dapat dihapus.
+
+## Struktur berkas
+
+| Berkas | Fungsi |
+| ------ | ------ |
+| `main.py` | Titik masuk program: menyiapkan database lalu menjalankan aplikasi. |
+| `app.py` | Jendela utama, gaya tampilan, dan penjadwal pengembalian otomatis. |
+| `database.py` | Lapisan basis data: skema tabel, koneksi, akun, buku, tag, dan peminjaman. |
+| `book_seed_data.py` | Data awal buku (metadata, PDF, dan sampul). |
+| `pages/` | Halaman login, siswa, dan admin. |
+| `ui_theme.py` | Daftar warna yang dipakai semua halaman. |
+| `requirements.txt`, `run.bat` | Daftar pustaka Python dan peluncur otomatis di Windows. |
+| `ERD db_perpustakaan_digital.jpeg` | Gambar ERD basis data. |
+
+## Dump SQL (opsional)
+
+Dump SQL opsional tersedia di folder proyek. `db_perpustakaan_digital (with_books).sql` berisi empat buku pilihan dan PDF-nya tanpa sampul; ukurannya sekitar 38,7 MB. `db_perpustakaan_digital (without_book_files).sql` mempertahankan metadata buku dan tag tanpa PDF atau sampul. Dump `with_books` yang asli berisi 21 buku dengan PDF dan sampul, sehingga ukurannya sekitar 207 MB. Untuk penggunaan aplikasi biasa, jalankan `main.py`; data contoh akan disiapkan otomatis. PDF dan sampul yang ditambahkan admin disimpan di database, sehingga ukuran database dan file hasil **Export** dapat menjadi besar.
